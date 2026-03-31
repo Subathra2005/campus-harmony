@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { User, UserRole } from '@/types';
+import { User, UserRole, Gender } from '@/types';
 
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => boolean;
-  signup: (name: string, email: string, password: string, role: UserRole) => boolean;
+  signup: (name: string, email: string, password: string, role: UserRole, gender?: Gender) => boolean;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -12,12 +12,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const DEMO_USERS: User[] = [
-  { id: '1', name: 'Dr. Admin', email: 'admin@college.edu', role: 'admin' },
-  { id: '2', name: 'Accounts Staff', email: 'accounts@college.edu', role: 'staff-accounts' },
-  { id: '3', name: 'Prof. Faculty', email: 'faculty@college.edu', role: 'staff-faculty' },
-  { id: '4', name: 'Hostel Warden', email: 'hostel@college.edu', role: 'staff-hostel' },
-  { id: '5', name: 'Librarian', email: 'library@college.edu', role: 'staff-library' },
-  { id: '6', name: 'John Student', email: 'student@college.edu', role: 'student' },
+  { id: '1', name: 'Dr. Admin', email: 'admin@college.edu', role: 'admin', gender: 'Female' },
+  { id: '2', name: 'Accounts Staff', email: 'accounts@college.edu', role: 'staff-accounts', gender: 'Male' },
+  { id: '3', name: 'Prof. Faculty', email: 'faculty@college.edu', role: 'staff-faculty', gender: 'Female' },
+  { id: '4', name: 'Hostel Warden', email: 'hostel@college.edu', role: 'staff-hostel', gender: 'Male' },
+  { id: '5', name: 'Librarian', email: 'library@college.edu', role: 'staff-library', gender: 'Female' },
+  { id: '6', name: 'John Student', email: 'student@college.edu', role: 'student', gender: 'Male' },
 ];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -44,8 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return false;
   }, []);
 
-  const signup = useCallback((name: string, email: string, _password: string, role: UserRole) => {
-    const newUser: User = { id: crypto.randomUUID(), name, email, role };
+  const signup = useCallback((name: string, email: string, _password: string, role: UserRole, gender: Gender = 'Other') => {
+    const newUser: User = { id: crypto.randomUUID(), name, email, role, gender };
     const registered = JSON.parse(sessionStorage.getItem('erp_registered_users') || '[]');
     registered.push(newUser);
     sessionStorage.setItem('erp_registered_users', JSON.stringify(registered));

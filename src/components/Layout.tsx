@@ -5,14 +5,15 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { Bell } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
+import { resolveNotificationAudience, notificationVisibleToUser } from '@/lib/notifications';
 
 export default function Layout() {
   const { user, isAuthenticated } = useAuth();
-  const { notifications } = useData();
+  const { notifications, students } = useData();
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-
-  const unread = notifications.filter(n => !n.read).length;
+  const audience = resolveNotificationAudience(user, students);
+  const unread = notifications.filter(n => notificationVisibleToUser(n, audience) && !n.read).length;
 
   return (
     <SidebarProvider>

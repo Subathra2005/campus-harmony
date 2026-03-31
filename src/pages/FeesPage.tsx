@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { FeePayment } from '@/types';
+import { FeePayment, Notification, UserRole } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DollarSign, Search, CreditCard, Download, Plus } from 'lucide-react';
 
 export default function FeesPage() {
-  const { feePayments, feeStructures, students, addFeePayment, updateFeePayment, addAuditLog } = useData();
+  const { feePayments, feeStructures, students, addFeePayment, updateFeePayment, addAuditLog, addNotification } = useData();
   const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -21,9 +21,17 @@ export default function FeesPage() {
   const [addDialog, setAddDialog] = useState(false);
   const [newFee, setNewFee] = useState({ studentId: '', amount: '', dueDate: '', installmentNo: '1' });
 
-  const isStudent = user?.role === 'student';
+  const notify = (payload: { title: string; message: string; type: Notification['type']; userId?: string; targetRole?: UserRole }) => {
+    addNotification({ id: crypto.randomUUID(), date: new Date().toISOString().split('T')[0], read: false, ...payload });
+  };
 
-  const filtered = feePayments.filter(f => {
+  const isStudent = user?.role === 'student';
+  const studentProfile = isStudent ? students.find(s => s.email === user?.email) : null;
+  const visibleFees = isStudent
+    ? (studentProfile ? feePayments.filter(f => f.studentId === studentProfile.id) : [])
+    : feePayments;
+
+  const filtered = visibleFees.filter(f => {
     const matchSearch = f.studentName.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === 'all' || f.status === statusFilter;
     return matchSearch && matchStatus;
@@ -32,6 +40,9 @@ export default function FeesPage() {
   const totalCollected = feePayments.reduce((s, f) => s + f.paidAmount, 0);
   const totalPending = feePayments.filter(f => f.status !== 'paid').reduce((s, f) => s + (f.amount - f.paidAmount), 0);
   const overdueTotal = feePayments.filter(f => f.status === 'overdue').reduce((s, f) => s + (f.amount - f.paidAmount), 0);
+  const studentPendingTotal = visibleFees.filter(f => f.status !== 'paid').reduce((sum, fee) => sum + (fee.amount - fee.paidAmount), 0);
+  const studentOverdueTotal = visibleFees.filter(f => f.status === 'overdue').reduce((sum, fee) => sum + (fee.amount - fee.paidAmount), 0);
+  const studentInstallmentsDue = visibleFees.filter(f => f.status !== 'paid').length;
 
   const handlePay = () => {
     if (!payDialog || !payAmount) return;
@@ -47,6 +58,12 @@ export default function FeesPage() {
     };
     updateFeePayment(updated);
     addAuditLog({ action: 'Fee payment', module: 'Fees', userId: user!.id, userName: user!.name, details: `₹${amount} paid for ${payDialog.studentName}` });
+    notify({
+      title: 'Fee payment received',
+      message: `${payDialog.studentName} paid ₹${amount.toLocaleString()}.`,
+      type: 'info',
+      targetRole: 'staff-accounts',
+    });
     setPayDialog(null);
     setPayAmount('');
   };
@@ -60,8 +77,40 @@ export default function FeesPage() {
       status: 'pending', installmentNo: Number(newFee.installmentNo),
     };
     addFeePayment(fee);
+    notify({
+      title: 'New fee installment',
+      message: `Installment ${fee.installmentNo} for ₹${fee.amount.toLocaleString()} is due on ${fee.dueDate}.`,
+      type: 'warning',
+      userId: student.id,
+    });
     setAddDialog(false);
     setNewFee({ studentId: '', amount: '', dueDate: '', installmentNo: '1' });
+  };
+
+  const handleDownloadReceipt = (fee: FeePayment) => {
+    if (!fee.receiptNo) return;
+    const paidDate = fee.paidDate || new Date().toISOString().split('T')[0];
+    const content = [
+      'EduManager College ERP Receipt',
+      '------------------------------',
+      `Receipt No: ${fee.receiptNo}`,
+      `Student: ${fee.studentName}`,
+      `Installment: ${fee.installmentNo}`,
+      `Total Amount: ₹${fee.amount.toLocaleString()}`,
+      `Paid Amount: ₹${fee.paidAmount.toLocaleString()}`,
+      `Status: ${fee.status.toUpperCase()}`,
+      `Payment Date: ${paidDate}`,
+    ].join('\n');
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeName = fee.studentName.replace(/\s+/g, '-').toLowerCase();
+    link.download = `${fee.receiptNo}-${safeName}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -73,6 +122,15 @@ export default function FeesPage() {
         </div>
         {!isStudent && <Button onClick={() => setAddDialog(true)}><Plus className="w-4 h-4 mr-2" />Add Fee</Button>}
       </div>
+
+        {isStudent && !studentProfile && (
+          <Card>
+            <CardContent className="text-sm text-muted-foreground">
+              Your admission is pending approval. Once the admin confirms your enrollment, your personalized fee schedule
+              will appear here for payment.
+            </CardContent>
+          </Card>
+        )}
 
       {!isStudent && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -91,12 +149,31 @@ export default function FeesPage() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search student..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} /></div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-48"><SelectValue /></SelectTrigger><SelectContent>
-          <SelectItem value="all">All Status</SelectItem><SelectItem value="paid">Paid</SelectItem><SelectItem value="pending">Pending</SelectItem><SelectItem value="overdue">Overdue</SelectItem><SelectItem value="partial">Partial</SelectItem>
-        </SelectContent></Select>
-      </div>
+      {isStudent && studentProfile && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="stat-card">
+            <div className="flex items-center justify-between mb-2"><span className="text-xs text-muted-foreground uppercase">Pending Amount</span><DollarSign className="w-4 h-4 text-warning" /></div>
+            <p className="text-xl font-bold">₹{studentPendingTotal.toLocaleString()}</p>
+          </div>
+          <div className="stat-card">
+            <div className="flex items-center justify-between mb-2"><span className="text-xs text-muted-foreground uppercase">Installments Due</span><DollarSign className="w-4 h-4 text-info" /></div>
+            <p className="text-xl font-bold">{studentInstallmentsDue}</p>
+          </div>
+          <div className="stat-card">
+            <div className="flex items-center justify-between mb-2"><span className="text-xs text-muted-foreground uppercase">Overdue</span><DollarSign className="w-4 h-4 text-destructive" /></div>
+            <p className="text-xl font-bold">₹{studentOverdueTotal.toLocaleString()}</p>
+          </div>
+        </div>
+      )}
+
+      {!isStudent && (
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" /><Input placeholder="Search student..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} /></div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="w-48"><SelectValue /></SelectTrigger><SelectContent>
+            <SelectItem value="all">All Status</SelectItem><SelectItem value="paid">Paid</SelectItem><SelectItem value="pending">Pending</SelectItem><SelectItem value="overdue">Overdue</SelectItem><SelectItem value="partial">Partial</SelectItem>
+          </SelectContent></Select>
+        </div>
+      )}
 
       <Card>
         <CardContent className="p-0">
@@ -116,16 +193,33 @@ export default function FeesPage() {
                     <TableCell><span className={f.status === 'paid' ? 'badge-success' : f.status === 'overdue' ? 'badge-destructive' : f.status === 'partial' ? 'badge-info' : 'badge-warning'}>{f.status}</span></TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        {f.status !== 'paid' && (
+                        {isStudent && studentProfile && f.studentId === studentProfile.id && f.status !== 'paid' && (
                           <Button variant="ghost" size="sm" onClick={() => { setPayDialog(f); setPayAmount(String(f.amount - f.paidAmount)); }}>
                             <CreditCard className="w-4 h-4 mr-1" />Pay
                           </Button>
                         )}
-                        {f.receiptNo && <Button variant="ghost" size="icon" title="Download Receipt"><Download className="w-4 h-4" /></Button>}
+                        {f.receiptNo && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Download Receipt"
+                            onClick={() => handleDownloadReceipt(f)}
+                            aria-label={`Download receipt ${f.receiptNo}`}
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
                 ))}
+                {filtered.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-6 text-center text-sm text-muted-foreground">
+                      {isStudent ? 'No fee schedule available yet.' : 'No fee records found.'}
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>

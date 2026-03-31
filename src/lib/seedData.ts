@@ -1,18 +1,18 @@
-import { Student, Admission, FeePayment, FeeStructure, HostelRoom, Book, BookIssue, Notification } from '@/types';
+import { Student, Admission, FeePayment, FeeStructure, HostelRoom, Book, BookIssue, Notification, HostelRequest } from '@/types';
 
 export const seedData = {
   students: [
-    { id: 's1', studentId: 'STU001', name: 'Aarav Sharma', email: 'aarav@student.edu', phone: '9876543210', course: 'B.Tech CS', year: 2, semester: 3, dob: '2003-05-15', gender: 'Male', address: '123 Main St, Delhi', guardianName: 'Raj Sharma', guardianPhone: '9876543211', status: 'active', admissionDate: '2023-08-01', documents: [], hostelRoomId: 'r1' },
-    { id: 's2', studentId: 'STU002', name: 'Priya Patel', email: 'priya@student.edu', phone: '9876543212', course: 'B.Tech ECE', year: 1, semester: 1, dob: '2004-03-22', gender: 'Female', address: '456 Oak Ave, Mumbai', guardianName: 'Suresh Patel', guardianPhone: '9876543213', status: 'active', admissionDate: '2024-08-01', documents: [], hostelRoomId: 'r2' },
-    { id: 's3', studentId: 'STU003', name: 'Rahul Kumar', email: 'rahul@student.edu', phone: '9876543214', course: 'BBA', year: 3, semester: 5, dob: '2002-11-10', gender: 'Male', address: '789 Pine Rd, Bangalore', guardianName: 'Mohan Kumar', guardianPhone: '9876543215', status: 'active', admissionDate: '2022-08-01', documents: [] },
-    { id: 's4', studentId: 'STU004', name: 'Ananya Singh', email: 'ananya@student.edu', phone: '9876543216', course: 'B.Tech CS', year: 1, semester: 1, dob: '2004-07-08', gender: 'Female', address: '321 Elm St, Chennai', guardianName: 'Vikram Singh', guardianPhone: '9876543217', status: 'active', admissionDate: '2024-08-01', documents: [] },
-    { id: 's5', studentId: 'STU005', name: 'Karan Mehta', email: 'karan@student.edu', phone: '9876543218', course: 'MBA', year: 2, semester: 3, dob: '2001-01-25', gender: 'Male', address: '654 Maple Dr, Pune', guardianName: 'Dinesh Mehta', guardianPhone: '9876543219', status: 'active', admissionDate: '2023-08-01', documents: [] },
+    { id: 's1', studentId: 'STU001', name: 'Aarav Sharma', email: 'aarav@student.edu', phone: '9876543210', course: 'B.Tech CS', year: 2, semester: 3, dob: '2003-05-15', gender: 'Male', address: '123 Main St, Delhi', guardianName: 'Raj Sharma', guardianPhone: '9876543211', status: 'active', admissionDate: '2023-08-01', documents: [], hostelRoomId: 'r1', residencyStatus: 'hosteller' },
+    { id: 's2', studentId: 'STU002', name: 'Priya Patel', email: 'priya@student.edu', phone: '9876543212', course: 'B.Tech ECE', year: 1, semester: 1, dob: '2004-03-22', gender: 'Female', address: '456 Oak Ave, Mumbai', guardianName: 'Suresh Patel', guardianPhone: '9876543213', status: 'active', admissionDate: '2024-08-01', documents: [], hostelRoomId: 'r2', residencyStatus: 'hosteller' },
+    { id: 's3', studentId: 'STU003', name: 'Rahul Kumar', email: 'rahul@student.edu', phone: '9876543214', course: 'BBA', year: 3, semester: 5, dob: '2002-11-10', gender: 'Male', address: '789 Pine Rd, Bangalore', guardianName: 'Mohan Kumar', guardianPhone: '9876543215', status: 'active', admissionDate: '2022-08-01', documents: [], residencyStatus: 'day-scholar' },
+    { id: 's4', studentId: 'STU004', name: 'Ananya Singh', email: 'ananya@student.edu', phone: '9876543216', course: 'B.Tech CS', year: 1, semester: 1, dob: '2004-07-08', gender: 'Female', address: '321 Elm St, Chennai', guardianName: 'Vikram Singh', guardianPhone: '9876543217', status: 'active', admissionDate: '2024-08-01', documents: [], residencyStatus: 'day-scholar' },
+    { id: 's5', studentId: 'STU005', name: 'Karan Mehta', email: 'karan@student.edu', phone: '9876543218', course: 'MBA', year: 2, semester: 3, dob: '2001-01-25', gender: 'Male', address: '654 Maple Dr, Pune', guardianName: 'Dinesh Mehta', guardianPhone: '9876543219', status: 'active', admissionDate: '2023-08-01', documents: [], residencyStatus: 'day-scholar' },
   ] as Student[],
 
   admissions: [
-    { id: 'a1', applicantName: 'Sneha Gupta', email: 'sneha@gmail.com', phone: '9988776655', course: 'B.Tech CS', dob: '2005-02-14', gender: 'Female', address: '100 Rose Lane, Jaipur', guardianName: 'Anil Gupta', guardianPhone: '9988776656', status: 'applied', appliedDate: '2025-03-10', documents: [], notes: '' },
-    { id: 'a2', applicantName: 'Vikash Yadav', email: 'vikash@gmail.com', phone: '9988776657', course: 'BBA', dob: '2005-06-20', gender: 'Male', address: '200 Lotus Rd, Lucknow', guardianName: 'Ram Yadav', guardianPhone: '9988776658', status: 'verified', appliedDate: '2025-03-08', documents: [], notes: 'Documents verified' },
-    { id: 'a3', applicantName: 'Meera Nair', email: 'meera@gmail.com', phone: '9988776659', course: 'B.Tech ECE', dob: '2005-09-05', gender: 'Female', address: '300 Jasmine Ave, Kerala', guardianName: 'Krishna Nair', guardianPhone: '9988776660', status: 'approved', appliedDate: '2025-03-05', documents: [], notes: 'Approved by dean' },
+    { id: 'a1', applicantName: 'Sneha Gupta', email: 'sneha@gmail.com', phone: '9988776655', course: 'B.Tech CS', dob: '2005-02-14', gender: 'Female', address: '100 Rose Lane, Jaipur', guardianName: 'Anil Gupta', guardianPhone: '9988776656', status: 'applied', appliedDate: '2025-03-10', documents: [], notes: '', residencyStatus: 'hosteller' },
+    { id: 'a2', applicantName: 'Vikash Yadav', email: 'vikash@gmail.com', phone: '9988776657', course: 'BBA', dob: '2005-06-20', gender: 'Male', address: '200 Lotus Rd, Lucknow', guardianName: 'Ram Yadav', guardianPhone: '9988776658', status: 'verified', appliedDate: '2025-03-08', documents: [], notes: 'Documents verified', residencyStatus: 'day-scholar' },
+    { id: 'a3', applicantName: 'Meera Nair', email: 'meera@gmail.com', phone: '9988776659', course: 'B.Tech ECE', dob: '2005-09-05', gender: 'Female', address: '300 Jasmine Ave, Kerala', guardianName: 'Krishna Nair', guardianPhone: '9988776660', status: 'approved', appliedDate: '2025-03-05', documents: [], notes: 'Approved by dean', residencyStatus: 'hosteller' },
   ] as Admission[],
 
   feePayments: [
@@ -37,6 +37,8 @@ export const seedData = {
     { id: 'r4', roomNumber: 'B-202', block: 'B', floor: 2, capacity: 3, occupants: [], type: 'triple', status: 'available', monthlyRent: 4000 },
     { id: 'r5', roomNumber: 'C-301', block: 'C', floor: 3, capacity: 2, occupants: [], type: 'double', status: 'maintenance', monthlyRent: 5000 },
   ] as HostelRoom[],
+
+  hostelRequests: [] as HostelRequest[],
 
   books: [
     { id: 'b1', title: 'Introduction to Algorithms', author: 'Cormen et al.', isbn: '978-0262033848', category: 'Computer Science', totalCopies: 10, availableCopies: 7, shelf: 'CS-01' },

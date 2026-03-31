@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
-import { UserRole } from '@/types';
+import { useData } from '@/contexts/DataContext';
+import { useNavigate } from 'react-router-dom';
+import { UserRole, Admission, Gender, ResidencyStatus } from '@/types';
 import { GraduationCap, Mail, Lock, User, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,21 +20,50 @@ const DEMO_ACCOUNTS = [
 
 export default function LoginPage() {
   const { login, signup } = useAuth();
+  const { addAdmission, admissions } = useData();
   const navigate = useNavigate();
   const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<UserRole>('student');
+  const [phone, setPhone] = useState('');
+  const [course, setCourse] = useState('B.Tech CS');
+  const [residency, setResidency] = useState<ResidencyStatus>('day-scholar');
+  const [gender, setGender] = useState<Gender>('Male');
   const [error, setError] = useState('');
+  const isStudentSignup = isSignup && role === 'student';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (isSignup) {
       if (!name.trim()) { setError('Name is required'); return; }
-      signup(name, email, password, role);
-      navigate('/');
+      const success = signup(name, email, password, role, role === 'student' ? gender : undefined);
+      if (success && role === 'student') {
+        const duplicate = admissions.some(a => a.email.toLowerCase() === email.toLowerCase());
+        if (!duplicate) {
+          const admission: Admission = {
+            id: crypto.randomUUID(),
+            applicantName: name,
+            email,
+            phone,
+            course,
+            dob: '',
+            gender,
+            address: '',
+            guardianName: '',
+            guardianPhone: '',
+            status: 'applied',
+            appliedDate: new Date().toISOString().split('T')[0],
+            documents: [],
+            notes: 'Student self-registration',
+            residencyStatus: residency,
+          };
+          addAdmission(admission);
+        }
+      }
+      if (success) navigate('/');
     } else {
       const success = login(email, password);
       if (success) navigate('/');
@@ -86,6 +116,47 @@ export default function LoginPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {isStudentSignup && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Contact Number</Label>
+                        <Input id="phone" placeholder="9876543210" value={phone} onChange={e => setPhone(e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Residency</Label>
+                        <Select value={residency} onValueChange={v => setResidency(v as ResidencyStatus)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="day-scholar">Day Scholar</SelectItem>
+                            <SelectItem value="hosteller">Hosteller</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Gender</Label>
+                        <Select value={gender} onValueChange={v => setGender(v as Gender)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Male">Male</SelectItem>
+                            <SelectItem value="Female">Female</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Preferred Course</Label>
+                        <Select value={course} onValueChange={setCourse}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="B.Tech CS">B.Tech CS</SelectItem>
+                            <SelectItem value="B.Tech ECE">B.Tech ECE</SelectItem>
+                            <SelectItem value="BBA">BBA</SelectItem>
+                            <SelectItem value="MBA">MBA</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
               <div className="space-y-2">

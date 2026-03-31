@@ -1,4 +1,6 @@
 export type UserRole = 'admin' | 'staff-accounts' | 'staff-faculty' | 'staff-hostel' | 'staff-library' | 'student';
+export type Gender = 'Male' | 'Female' | 'Other';
+export type ResidencyStatus = 'day-scholar' | 'hosteller';
 
 export interface User {
   id: string;
@@ -6,6 +8,7 @@ export interface User {
   email: string;
   role: UserRole;
   avatar?: string;
+  gender?: Gender;
 }
 
 export interface Student {
@@ -18,7 +21,7 @@ export interface Student {
   year: number;
   semester: number;
   dob: string;
-  gender: string;
+  gender: Gender;
   address: string;
   guardianName: string;
   guardianPhone: string;
@@ -26,6 +29,7 @@ export interface Student {
   admissionDate: string;
   documents: Document[];
   hostelRoomId?: string;
+  residencyStatus: ResidencyStatus;
 }
 
 export interface Admission {
@@ -35,7 +39,7 @@ export interface Admission {
   phone: string;
   course: string;
   dob: string;
-  gender: string;
+  gender: Gender;
   address: string;
   guardianName: string;
   guardianPhone: string;
@@ -43,6 +47,8 @@ export interface Admission {
   appliedDate: string;
   documents: Document[];
   notes: string;
+  residencyStatus?: ResidencyStatus;
+  studentId?: string;
 }
 
 export interface FeeStructure {
@@ -79,6 +85,17 @@ export interface HostelRoom {
   monthlyRent: number;
 }
 
+export interface HostelRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  preferredType: HostelRoom['type'];
+  roomId?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedDate: string;
+  notes?: string;
+}
+
 export interface Book {
   id: string;
   title: string;
@@ -100,7 +117,7 @@ export interface BookIssue {
   dueDate: string;
   returnDate?: string;
   fine: number;
-  status: 'issued' | 'returned' | 'overdue';
+  status: 'pending' | 'issued' | 'returned' | 'overdue' | 'rejected';
 }
 
 export interface Document {
@@ -118,6 +135,7 @@ export interface Notification {
   date: string;
   read: boolean;
   userId?: string;
+  targetRole?: UserRole;
 }
 
 export interface AuditLog {

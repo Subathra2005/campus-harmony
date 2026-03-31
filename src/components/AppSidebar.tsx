@@ -1,10 +1,11 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useData } from '@/contexts/DataContext';
 import { useLocation } from 'react-router-dom';
 import { NavLink } from '@/components/NavLink';
 import {
   LayoutDashboard, Users, FileText, DollarSign, Building2, BookOpen,
-  Bell, ClipboardList, LogOut, GraduationCap, Settings
+  Bell, ClipboardList, LogOut, GraduationCap,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -64,10 +65,15 @@ function getNavForRole(role: string) {
 
 export function AppSidebar() {
   const { user, logout } = useAuth();
+  const { students } = useData();
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
-  const nav = getNavForRole(user?.role || 'student');
+  const studentProfile = user?.role === 'student' ? students.find(s => s.email === user?.email) : null;
+  let nav = getNavForRole(user?.role || 'student');
+  if (user?.role === 'student' && studentProfile?.residencyStatus !== 'hosteller') {
+    nav = nav.filter(item => item.url !== '/hostel');
+  }
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">

@@ -7,17 +7,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Search, Pencil, Trash2, Download } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 const COURSES = ['B.Tech CS', 'B.Tech ECE', 'BBA', 'MBA'];
-
 export default function StudentsPage() {
   const { students, addStudent, updateStudent, deleteStudent, addAuditLog } = useData();
   const { user } = useAuth();
+  const { toast } = useToast();
+  const isAdmin = user?.role === 'admin';
   const [search, setSearch] = useState('');
   const [courseFilter, setCourseFilter] = useState('all');
+  const [genderFilter, setGenderFilter] = useState<'all' | Student['gender']>('all');
+  const [residencyFilter, setResidencyFilter] = useState<'all' | Student['residencyStatus']>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
 
@@ -25,6 +29,7 @@ export default function StudentsPage() {
     name: '', email: '', phone: '', course: 'B.Tech CS', year: 1, semester: 1,
     dob: '', gender: 'Male', address: '', guardianName: '', guardianPhone: '',
     status: 'active', admissionDate: new Date().toISOString().split('T')[0], documents: [],
+    residencyStatus: 'day-scholar',
   };
   const [form, setForm] = useState(emptyStudent);
 
@@ -33,7 +38,9 @@ export default function StudentsPage() {
       s.studentId.toLowerCase().includes(search.toLowerCase()) ||
       s.email.toLowerCase().includes(search.toLowerCase());
     const matchCourse = courseFilter === 'all' || s.course === courseFilter;
-    return matchSearch && matchCourse;
+    const matchGender = genderFilter === 'all' || s.gender === genderFilter;
+    const matchResidency = residencyFilter === 'all' || s.residencyStatus === residencyFilter;
+    return matchSearch && matchCourse && matchGender && matchResidency;
   });
 
   const openAdd = () => { setEditing(null); setForm(emptyStudent); setDialogOpen(true); };
@@ -41,6 +48,16 @@ export default function StudentsPage() {
 
   const handleSave = () => {
     if (!form.name || !form.email) return;
+    if (!editing && !isAdmin) {
+      toast({ title: 'Access denied', description: 'Only administrators can add new students.', variant: 'destructive' });
+      setDialogOpen(false);
+      return;
+    }
+    if (editing && !isAdmin) {
+      toast({ title: 'Access denied', description: 'Only administrators can edit student records.', variant: 'destructive' });
+      setDialogOpen(false);
+      return;
+    }
     if (editing) {
       updateStudent({ ...editing, ...form });
       addAuditLog({ action: 'Updated student', module: 'Students', userId: user!.id, userName: user!.name, details: `Updated ${form.name}` });
@@ -53,6 +70,10 @@ export default function StudentsPage() {
   };
 
   const handleDelete = (s: Student) => {
+    if (!isAdmin) {
+      toast({ title: 'Access denied', description: 'Only administrators can delete student records.', variant: 'destructive' });
+      return;
+    }
     deleteStudent(s.id);
     addAuditLog({ action: 'Deleted student', module: 'Students', userId: user!.id, userName: user!.name, details: `Deleted ${s.name}` });
   };
@@ -64,12 +85,12 @@ export default function StudentsPage() {
           <h1 className="module-header">Students</h1>
           <p className="text-muted-foreground text-sm">{students.length} total students</p>
         </div>
-        {user?.role !== 'student' && (
+        {isAdmin && (
           <Button onClick={openAdd}><Plus className="w-4 h-4 mr-2" /> Add Student</Button>
         )}
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col lg:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search by name, ID, or email..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
@@ -79,6 +100,23 @@ export default function StudentsPage() {
           <SelectContent>
             <SelectItem value="all">All Courses</SelectItem>
             {COURSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={genderFilter} onValueChange={v => setGenderFilter(v as typeof genderFilter)}>
+          <SelectTrigger className="w-40"><SelectValue placeholder="Gender" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Genders</SelectItem>
+            <SelectItem value="Male">Male</SelectItem>
+            <SelectItem value="Female">Female</SelectItem>
+            <SelectItem value="Other">Other</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={residencyFilter} onValueChange={v => setResidencyFilter(v as typeof residencyFilter)}>
+          <SelectTrigger className="w-44"><SelectValue placeholder="Residency" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Residency</SelectItem>
+            <SelectItem value="day-scholar">Day Scholars</SelectItem>
+            <SelectItem value="hosteller">Hostellers</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -94,8 +132,10 @@ export default function StudentsPage() {
                   <TableHead className="hidden md:table-cell">Course</TableHead>
                   <TableHead className="hidden md:table-cell">Year</TableHead>
                   <TableHead className="hidden lg:table-cell">Phone</TableHead>
+                  <TableHead className="hidden lg:table-cell">Gender</TableHead>
+                  <TableHead className="hidden lg:table-cell">Residency</TableHead>
                   <TableHead>Status</TableHead>
-                  {user?.role !== 'student' && <TableHead className="text-right">Actions</TableHead>}
+                  {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -111,10 +151,12 @@ export default function StudentsPage() {
                     <TableCell className="hidden md:table-cell text-sm">{s.course}</TableCell>
                     <TableCell className="hidden md:table-cell text-sm">Year {s.year}</TableCell>
                     <TableCell className="hidden lg:table-cell text-sm">{s.phone}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-sm">{s.gender}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-sm">{s.residencyStatus === 'hosteller' ? 'Hosteller' : 'Day Scholar'}</TableCell>
                     <TableCell>
                       <span className={s.status === 'active' ? 'badge-success' : s.status === 'graduated' ? 'badge-info' : 'badge-warning'}>{s.status}</span>
                     </TableCell>
-                    {user?.role !== 'student' && (
+                    {isAdmin && (
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="icon" onClick={() => openEdit(s)}><Pencil className="w-4 h-4" /></Button>
@@ -125,7 +167,7 @@ export default function StudentsPage() {
                   </TableRow>
                 ))}
                 {filtered.length === 0 && (
-                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No students found</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isAdmin ? 9 : 8} className="text-center py-8 text-muted-foreground">No students found</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -154,6 +196,16 @@ export default function StudentsPage() {
             <div className="space-y-1">
               <Label>Gender</Label>
               <Select value={form.gender} onValueChange={v => setForm({ ...form, gender: v })}>
+                            <div className="space-y-1">
+                              <Label>Residency</Label>
+                              <Select value={form.residencyStatus} onValueChange={v => setForm({ ...form, residencyStatus: v as Student['residencyStatus'] })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="day-scholar">Day Scholar</SelectItem>
+                                  <SelectItem value="hosteller">Hosteller</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Male">Male</SelectItem>

@@ -2,38 +2,44 @@ import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, BookOpen, Building2, Bell } from 'lucide-react';
+import { DollarSign, BookOpen, Bell, ListChecks } from 'lucide-react';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
-  const { students, feePayments, hostelRooms, bookIssues, notifications } = useData();
+  const { students, feePayments, bookIssues, notifications } = useData();
 
-  // Find student record by email match
-  const student = students.find(s => s.email === user?.email) || students[0];
-  const myFees = feePayments.filter(f => f.studentId === student?.id);
-  const myRoom = hostelRooms.find(r => r.id === student?.hostelRoomId);
-  const myBooks = bookIssues.filter(bi => bi.studentId === student?.id && bi.status !== 'returned');
-  const myNotifications = notifications.filter(n => !n.read && (!n.userId || n.userId === student?.id));
+  const student = user?.role === 'student'
+    ? students.find(s => s.email === user.email)
+    : null;
 
-  const totalDue = myFees.filter(f => f.status !== 'paid').reduce((s, f) => s + (f.amount - f.paidAmount), 0);
-  const totalPaid = myFees.filter(f => f.status === 'paid').reduce((s, f) => s + f.paidAmount, 0);
+  const studentId = student?.id;
+  const myFees = studentId ? feePayments.filter(f => f.studentId === studentId) : [];
+  const pendingFees = myFees.filter(f => f.status !== 'paid');
+  const pendingFeeAmount = pendingFees.reduce((sum, fee) => sum + (fee.amount - fee.paidAmount), 0);
+
+  const pendingBooks = studentId
+    ? bookIssues.filter(bi => bi.studentId === studentId && bi.status !== 'returned')
+    : [];
+
+  const notificationKey = studentId || user?.id;
+  const unreadNotifications = notifications.filter(n => !n.read && (!n.userId || (notificationKey && n.userId === notificationKey)));
+
+  const pendingInstallments = pendingFees.length;
+  const studentName = student?.name || user?.name || 'Student';
+  const isProfileMissing = user?.role === 'student' && !student;
+  const nothingPending = pendingFees.length === 0 && pendingBooks.length === 0 && unreadNotifications.length === 0;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="module-header">Student Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">Welcome back, {student?.name || user?.name}</p>
+        <p className="text-muted-foreground text-sm mt-1">Welcome back, {studentName}</p>
       </div>
-
-      {student && (
+      {isProfileMissing && (
         <Card>
-          <CardContent className="pt-5">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div><span className="text-muted-foreground block text-xs">Student ID</span><span className="font-medium">{student.studentId}</span></div>
-              <div><span className="text-muted-foreground block text-xs">Course</span><span className="font-medium">{student.course}</span></div>
-              <div><span className="text-muted-foreground block text-xs">Year / Sem</span><span className="font-medium">Year {student.year} / Sem {student.semester}</span></div>
-              <div><span className="text-muted-foreground block text-xs">Status</span><span className="badge-success">{student.status}</span></div>
-            </div>
+          <CardContent className="text-sm text-muted-foreground">
+            We couldn't match this login to a campus profile yet. Once the admin approves your admission, your course
+            and enrollment details will appear here automatically.
           </CardContent>
         </Card>
       )}
@@ -41,89 +47,106 @@ export default function StudentDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="stat-card">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground uppercase">Fee Paid</span>
-            <DollarSign className="w-4 h-4 text-success" />
-          </div>
-          <p className="text-xl font-bold">₹{totalPaid.toLocaleString()}</p>
-        </div>
-        <div className="stat-card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground uppercase">Fee Due</span>
+            <span className="text-xs text-muted-foreground uppercase">Pending Fee</span>
             <DollarSign className="w-4 h-4 text-warning" />
           </div>
-          <p className="text-xl font-bold">₹{totalDue.toLocaleString()}</p>
+          <p className="text-xl font-bold">₹{pendingFeeAmount.toLocaleString()}</p>
         </div>
         <div className="stat-card">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground uppercase">Books Borrowed</span>
+            <span className="text-xs text-muted-foreground uppercase">Installments Due</span>
+            <ListChecks className="w-4 h-4 text-info" />
+          </div>
+          <p className="text-xl font-bold">{pendingInstallments}</p>
+        </div>
+        <div className="stat-card">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-muted-foreground uppercase">Books to Return</span>
             <BookOpen className="w-4 h-4 text-info" />
           </div>
-          <p className="text-xl font-bold">{myBooks.length}</p>
+          <p className="text-xl font-bold">{pendingBooks.length}</p>
         </div>
         <div className="stat-card">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground uppercase">Notifications</span>
+            <span className="text-xs text-muted-foreground uppercase">Unread Alerts</span>
             <Bell className="w-4 h-4 text-primary" />
           </div>
-          <p className="text-xl font-bold">{myNotifications.length}</p>
+          <p className="text-xl font-bold">{unreadNotifications.length}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {nothingPending ? (
         <Card>
-          <CardHeader><CardTitle className="text-base">Fee History</CardTitle></CardHeader>
-          <CardContent>
-            {myFees.length === 0 ? <p className="text-sm text-muted-foreground">No fee records</p> : (
-              <div className="space-y-3">
-                {myFees.map(f => (
-                  <div key={f.id} className="flex items-center justify-between text-sm">
-                    <div>
-                      <p className="font-medium">Installment {f.installmentNo}</p>
-                      <p className="text-xs text-muted-foreground">Due: {f.dueDate}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">₹{f.amount.toLocaleString()}</p>
-                      <span className={f.status === 'paid' ? 'badge-success' : f.status === 'overdue' ? 'badge-destructive' : 'badge-warning'}>{f.status}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+          <CardContent className="text-sm text-muted-foreground py-6 text-center">
+            You're all caught up. We'll notify you here whenever new fee installments, books, or alerts need your
+            attention.
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader><CardTitle className="text-base">Hostel Info</CardTitle></CardHeader>
-          <CardContent>
-            {myRoom ? (
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Room</span><span className="font-medium">{myRoom.roomNumber}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Block</span><span className="font-medium">{myRoom.block}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Type</span><span className="font-medium capitalize">{myRoom.type}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Monthly Rent</span><span className="font-medium">₹{myRoom.monthlyRent}</span></div>
-              </div>
-            ) : <p className="text-sm text-muted-foreground">No hostel room assigned</p>}
-          </CardContent>
-        </Card>
-      </div>
-
-      {myBooks.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">Borrowed Books</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {myBooks.map(bi => (
-                <div key={bi.id} className="flex items-center justify-between text-sm">
-                  <div>
-                    <p className="font-medium">{bi.bookTitle}</p>
-                    <p className="text-xs text-muted-foreground">Due: {bi.dueDate}</p>
-                  </div>
-                  <span className={bi.status === 'overdue' ? 'badge-destructive' : 'badge-info'}>{bi.status}</span>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Pending Fee Actions</CardTitle></CardHeader>
+            <CardContent>
+              {pendingFees.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No unpaid installments right now.</p>
+              ) : (
+                <div className="space-y-3">
+                  {pendingFees.map(f => (
+                    <div key={f.id} className="flex items-center justify-between text-sm">
+                      <div>
+                        <p className="font-medium">Installment {f.installmentNo}</p>
+                        <p className="text-xs text-muted-foreground">Due: {f.dueDate}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">₹{(f.amount - f.paidAmount).toLocaleString()}</p>
+                        <span className={f.status === 'overdue' ? 'badge-destructive' : 'badge-warning'}>{f.status}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Books To Return</CardTitle></CardHeader>
+            <CardContent>
+              {pendingBooks.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No outstanding books.</p>
+              ) : (
+                <div className="space-y-3">
+                  {pendingBooks.map(bi => (
+                    <div key={bi.id} className="flex items-center justify-between text-sm">
+                      <div>
+                        <p className="font-medium">{bi.bookTitle}</p>
+                        <p className="text-xs text-muted-foreground">Due: {bi.dueDate}</p>
+                      </div>
+                      <span className={bi.status === 'overdue' ? 'badge-destructive' : 'badge-info'}>{bi.status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Unread Notifications</CardTitle></CardHeader>
+            <CardContent>
+              {unreadNotifications.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No pending alerts.</p>
+              ) : (
+                <div className="space-y-3">
+                  {unreadNotifications.map(n => (
+                    <div key={n.id} className="text-sm">
+                      <p className="font-medium">{n.title}</p>
+                      <p className="text-xs text-muted-foreground">{n.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );

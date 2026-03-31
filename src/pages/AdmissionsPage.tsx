@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { Admission } from '@/types';
+import { Admission, Notification, UserRole } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +14,12 @@ import { Plus, Search, CheckCircle, XCircle, Eye } from 'lucide-react';
 const COURSES = ['B.Tech CS', 'B.Tech ECE', 'BBA', 'MBA'];
 
 export default function AdmissionsPage() {
-  const { admissions, addAdmission, updateAdmission, approveAdmission, addAuditLog } = useData();
+  const { admissions, addAdmission, updateAdmission, approveAdmission, addAuditLog, students, addNotification } = useData();
   const { user } = useAuth();
+    const notify = (payload: { title: string; message: string; type: Notification['type']; userId?: string; targetRole?: UserRole }) => {
+      addNotification({ id: crypto.randomUUID(), date: new Date().toISOString().split('T')[0], read: false, ...payload });
+    };
+    const studentProfile = user?.role === 'student' ? students.find(s => s.email === user?.email) : null;
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -35,28 +39,60 @@ export default function AdmissionsPage() {
 
   const handleSubmit = () => {
     if (!form.applicantName || !form.email) return;
+    const linkedStudent = students.find(s => s.email === form.email) ?? studentProfile ?? null;
     const admission: Admission = {
       ...form, id: crypto.randomUUID(), status: 'applied',
       appliedDate: new Date().toISOString().split('T')[0], documents: [],
+      studentId: linkedStudent?.id,
     };
     addAdmission(admission);
     addAuditLog({ action: 'New admission', module: 'Admissions', userId: user!.id, userName: user!.name, details: `Application from ${form.applicantName}` });
+    notify({
+      title: 'New admission application',
+      message: `${form.applicantName} applied for ${form.course}.`,
+      type: 'info',
+      targetRole: 'admin',
+    });
     setDialogOpen(false);
     setForm(emptyForm);
   };
 
-  const handleApprove = (id: string) => {
-    approveAdmission(id);
-    addAuditLog({ action: 'Approved admission', module: 'Admissions', userId: user!.id, userName: user!.name, details: `Approved application ${id}` });
+  const handleApprove = (admission: Admission) => {
+    approveAdmission(admission.id);
+    addAuditLog({ action: 'Approved admission', module: 'Admissions', userId: user!.id, userName: user!.name, details: `Approved application ${admission.id}` });
+    if (admission.studentId) {
+      notify({
+        title: 'Admission approved',
+        message: `Your application for ${admission.course} has been approved.`,
+        type: 'success',
+        userId: admission.studentId,
+      });
+    }
   };
 
   const handleReject = (a: Admission) => {
     updateAdmission({ ...a, status: 'rejected' });
     addAuditLog({ action: 'Rejected admission', module: 'Admissions', userId: user!.id, userName: user!.name, details: `Rejected ${a.applicantName}` });
+    if (a.studentId) {
+      notify({
+        title: 'Admission update',
+        message: 'Your admission application was rejected. Please contact the admin office for details.',
+        type: 'error',
+        userId: a.studentId,
+      });
+    }
   };
 
   const handleVerify = (a: Admission) => {
     updateAdmission({ ...a, status: 'verified' });
+    if (a.studentId) {
+      notify({
+        title: 'Admission update',
+        message: 'Your admission documents were verified.',
+        type: 'info',
+        userId: a.studentId,
+      });
+    }
   };
 
   const statusBadge = (status: string) => {
@@ -125,7 +161,7 @@ export default function AdmissionsPage() {
                         )}
                         {(a.status === 'applied' || a.status === 'verified') && (
                           <>
-                            <Button variant="ghost" size="icon" onClick={() => handleApprove(a.id)} title="Approve"><CheckCircle className="w-4 h-4 text-success" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleApprove(a)} title="Approve"><CheckCircle className="w-4 h-4 text-success" /></Button>
                             <Button variant="ghost" size="icon" onClick={() => handleReject(a)} title="Reject"><XCircle className="w-4 h-4 text-destructive" /></Button>
                           </>
                         )}
