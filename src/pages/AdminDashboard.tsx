@@ -1,9 +1,9 @@
 import React from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
-import { Users, DollarSign, Building2, BookOpen, FileText, TrendingUp, AlertCircle } from 'lucide-react';
+import { Users, DollarSign, Building2, FileText, AlertCircle, MessageSquare } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import StudentBulkUpload from '@/components/StudentBulkUpload';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const COLORS = ['hsl(175,55%,38%)', 'hsl(220,60%,25%)', 'hsl(38,92%,50%)', 'hsl(0,72%,51%)', 'hsl(205,80%,50%)'];
 
@@ -46,6 +46,26 @@ export default function AdminDashboard() {
       <div>
         <h1 className="module-header">Admin Dashboard</h1>
         <p className="text-muted-foreground text-sm mt-1">Overview of all college operations</p>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+        <StudentBulkUpload />
+        <Card className="bg-card/80 border-dashed">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              <CardTitle className="text-base">Campus Assistant</CardTitle>
+            </div>
+            <p className="text-sm text-muted-foreground">Use the floating chat bubble to add a single student, request summaries, or ask for admin shortcuts without leaving this page.</p>
+          </CardHeader>
+          <CardContent className="text-xs text-muted-foreground space-y-2">
+            <p>Quick commands you can try:</p>
+            <ul className="list-disc pl-4 space-y-1">
+              <li>"Add a student named Riya Singh in BBA"</li>
+              <li>"Show me pending admissions"</li>
+            </ul>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -2,14 +2,25 @@ import React, { useState } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { HostelRoom, HostelRequest, Notification, UserRole } from '@/types';
+import HostelBulkUpload from '@/components/HostelBulkUpload';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Building2, Users, Wrench, Plus, UserPlus, Send, CheckCircle, XCircle } from 'lucide-react';
+import { Building2, Users, Wrench, Plus, UserPlus, Send, CheckCircle, XCircle, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function HostelPage() {
   const {
@@ -18,6 +29,7 @@ export default function HostelPage() {
     students,
     addHostelRoom,
     updateHostelRoom,
+    deleteHostelRoom,
     updateStudent,
     addHostelRequest,
     updateHostelRequest,
@@ -30,6 +42,11 @@ export default function HostelPage() {
   const [selectedStudent, setSelectedStudent] = useState('');
   const [requestRoom, setRequestRoom] = useState<HostelRoom | null>(null);
   const [newRoom, setNewRoom] = useState({ roomNumber: '', block: 'A', floor: '1', capacity: '2', type: 'double' as const, monthlyRent: '5000' });
+  const [editRoom, setEditRoom] = useState<HostelRoom | null>(null);
+  const [editRoomForm, setEditRoomForm] = useState<{ roomNumber: string; block: string; floor: string; capacity: string; type: HostelRoom['type']; monthlyRent: string; status: HostelRoom['status']; }>(
+    { roomNumber: '', block: 'A', floor: '1', capacity: '2', type: 'double', monthlyRent: '5000', status: 'available' }
+  );
+  const [roomToDelete, setRoomToDelete] = useState<HostelRoom | null>(null);
   const { toast } = useToast();
   const notify = (payload: { title: string; message: string; type: Notification['type']; userId?: string; targetRole?: UserRole }) => {
     addNotification({ id: crypto.randomUUID(), date: new Date().toISOString().split('T')[0], read: false, ...payload });
@@ -79,6 +96,84 @@ export default function HostelPage() {
     };
     addHostelRoom(room);
     setAddDialog(false);
+  };
+
+  const startEditRoom = (room: HostelRoom) => {
+    setEditRoom(room);
+    setEditRoomForm({
+      roomNumber: room.roomNumber,
+      block: room.block,
+      floor: String(room.floor),
+      capacity: String(room.capacity),
+      type: room.type,
+      monthlyRent: String(room.monthlyRent),
+      status: room.status,
+    });
+  };
+
+  const handleUpdateRoom = () => {
+    if (!isHostelStaff || !editRoom) {
+      toast({ title: 'Action restricted', description: 'Only the hostel warden can manage rooms.', variant: 'destructive' });
+      return;
+    }
+    const floor = Number(editRoomForm.floor);
+    const capacity = Number(editRoomForm.capacity);
+    const monthlyRent = Number(editRoomForm.monthlyRent);
+    if (!Number.isFinite(capacity) || capacity <= 0) {
+      toast({ title: 'Invalid capacity', description: 'Capacity must be at least 1.', variant: 'destructive' });
+      return;
+    }
+    if (editRoom.occupants.length > capacity) {
+      toast({ title: 'Cannot reduce capacity', description: 'Capacity cannot be lower than the current occupant count.', variant: 'destructive' });
+      return;
+    }
+    if (!Number.isFinite(floor)) {
+      toast({ title: 'Invalid floor', description: 'Floor should be a valid number.', variant: 'destructive' });
+      return;
+    }
+    if (!Number.isFinite(monthlyRent) || monthlyRent < 0) {
+      toast({ title: 'Invalid rent', description: 'Monthly rent must be zero or greater.', variant: 'destructive' });
+      return;
+    }
+    const updated: HostelRoom = {
+      ...editRoom,
+      roomNumber: editRoomForm.roomNumber.trim(),
+      block: editRoomForm.block.trim(),
+      floor,
+      capacity,
+      type: editRoomForm.type,
+      monthlyRent,
+      status: editRoomForm.status,
+    };
+    updateHostelRoom(updated);
+    addAuditLog({ action: 'Hostel room updated', module: 'Hostel', userId: user!.id, userName: user!.name, details: updated.roomNumber });
+    toast({ title: 'Room updated', description: `${updated.roomNumber} was updated successfully.` });
+    setEditRoom(null);
+  };
+
+  const requestDeleteRoom = (room: HostelRoom) => {
+    if (!isHostelStaff) {
+      toast({ title: 'Action restricted', description: 'Only the hostel warden can manage rooms.', variant: 'destructive' });
+      return;
+    }
+    if (room.occupants.length > 0) {
+      toast({ title: 'Cannot delete room', description: 'Unassign all occupants before deleting this room.', variant: 'destructive' });
+      return;
+    }
+    const pendingRequestsForRoom = hostelRequests.some(request => request.roomId === room.id && request.status === 'pending');
+    if (pendingRequestsForRoom) {
+      toast({ title: 'Pending requests exist', description: 'Resolve pending requests tied to this room before deleting it.', variant: 'destructive' });
+      return;
+    }
+    setRoomToDelete(room);
+  };
+
+  const handleConfirmDeleteRoom = () => {
+    if (!roomToDelete || !isHostelStaff) return;
+    deleteHostelRoom(roomToDelete.id);
+    addAuditLog({ action: 'Hostel room deleted', module: 'Hostel', userId: user!.id, userName: user!.name, details: roomToDelete.roomNumber });
+    toast({ title: 'Room deleted', description: `${roomToDelete.roomNumber} has been removed.` });
+    setRoomToDelete(null);
   };
 
   const handleAssign = () => {
@@ -221,6 +316,8 @@ export default function HostelPage() {
         <div className="stat-card"><div className="flex items-center justify-between mb-2"><span className="text-xs text-muted-foreground uppercase">Maintenance</span><Wrench className="w-4 h-4 text-warning" /></div><p className="text-xl font-bold">{maintenance}</p></div>
       </div>
 
+      {isHostelStaff && <HostelBulkUpload />}
+
       {isStudent && (
         <Card>
           <CardContent className="space-y-2 text-sm">
@@ -292,7 +389,19 @@ export default function HostelPage() {
                   <h3 className="font-bold text-lg">{room.roomNumber}</h3>
                   <p className="text-xs text-muted-foreground">Block {room.block} • Floor {room.floor}</p>
                 </div>
-                <span className={displayStatus === 'available' ? 'badge-success' : displayStatus === 'occupied' ? 'badge-info' : 'badge-warning'}>{displayStatus}</span>
+                <div className="flex items-center gap-1">
+                  {isHostelStaff && (
+                    <>
+                      <Button variant="ghost" size="icon" onClick={() => startEditRoom(room)} title="Edit room">
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => requestDeleteRoom(room)} title="Delete room">
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </>
+                  )}
+                  <span className={displayStatus === 'available' ? 'badge-success' : displayStatus === 'occupied' ? 'badge-info' : 'badge-warning'}>{displayStatus}</span>
+                </div>
               </div>
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Type</span><span className="capitalize">{room.type}</span></div>
@@ -345,6 +454,28 @@ export default function HostelPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog
+        open={isHostelStaff && !!editRoom}
+        onOpenChange={open => {
+          if (!isHostelStaff) return;
+          if (!open) setEditRoom(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Room</DialogTitle></DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Room Number</Label><Input value={editRoomForm.roomNumber} onChange={e => setEditRoomForm({ ...editRoomForm, roomNumber: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Block</Label><Input value={editRoomForm.block} onChange={e => setEditRoomForm({ ...editRoomForm, block: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Floor</Label><Input type="number" value={editRoomForm.floor} onChange={e => setEditRoomForm({ ...editRoomForm, floor: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Capacity</Label><Input type="number" value={editRoomForm.capacity} onChange={e => setEditRoomForm({ ...editRoomForm, capacity: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Type</Label><Select value={editRoomForm.type} onValueChange={v => setEditRoomForm({ ...editRoomForm, type: v as HostelRoom['type'] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="single">Single</SelectItem><SelectItem value="double">Double</SelectItem><SelectItem value="triple">Triple</SelectItem></SelectContent></Select></div>
+            <div className="space-y-1"><Label>Status</Label><Select value={editRoomForm.status} onValueChange={v => setEditRoomForm({ ...editRoomForm, status: v as HostelRoom['status'] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="available">Available</SelectItem><SelectItem value="occupied">Occupied</SelectItem><SelectItem value="maintenance">Maintenance</SelectItem></SelectContent></Select></div>
+            <div className="space-y-1"><Label>Monthly Rent</Label><Input type="number" value={editRoomForm.monthlyRent} onChange={e => setEditRoomForm({ ...editRoomForm, monthlyRent: e.target.value })} /></div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4"><Button variant="outline" onClick={() => setEditRoom(null)}>Cancel</Button><Button onClick={handleUpdateRoom}>Save changes</Button></div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!requestRoom} onOpenChange={() => setRequestRoom(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Request {requestRoom?.roomNumber}</DialogTitle></DialogHeader>
@@ -377,6 +508,23 @@ export default function HostelPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!roomToDelete} onOpenChange={open => { if (!open) setRoomToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete hostel room?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {roomToDelete ? `This will remove ${roomToDelete.roomNumber} from the hostel inventory.` : 'This will remove the selected room.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteRoom} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

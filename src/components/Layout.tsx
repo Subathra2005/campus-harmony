@@ -6,6 +6,7 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { Bell } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { resolveNotificationAudience, notificationVisibleToUser } from '@/lib/notifications';
+import CampusAssistant from '@/components/CampusAssistant';
 
 export default function Layout() {
   const { user, isAuthenticated } = useAuth();
@@ -46,6 +47,7 @@ export default function Layout() {
           </main>
         </div>
       </div>
+      <CampusAssistant />
     </SidebarProvider>
   );
 }

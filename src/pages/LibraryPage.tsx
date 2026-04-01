@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Book, BookIssue, Notification, UserRole } from '@/types';
+import LibraryBulkUpload from '@/components/LibraryBulkUpload';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,11 +11,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, Search, Plus, RotateCcw, BookMarked, CheckCircle, XCircle } from 'lucide-react';
+import { BookOpen, Search, Plus, RotateCcw, BookMarked, CheckCircle, XCircle, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function LibraryPage() {
-  const { books, bookIssues, students, addBook, updateBook, addBookIssue, updateBookIssue, addAuditLog, addNotification } = useData();
+  const { books, bookIssues, students, addBook, updateBook, deleteBook, addBookIssue, updateBookIssue, addAuditLog, addNotification } = useData();
   const { user } = useAuth();
   const { toast } = useToast();
   const [search, setSearch] = useState('');
@@ -22,6 +33,9 @@ export default function LibraryPage() {
   const [issueDialog, setIssueDialog] = useState(false);
   const [newBook, setNewBook] = useState({ title: '', author: '', isbn: '', category: '', totalCopies: '1', shelf: '' });
   const [issueForm, setIssueForm] = useState({ bookId: '', studentId: '' });
+  const [editBook, setEditBook] = useState<Book | null>(null);
+  const [editForm, setEditForm] = useState({ title: '', author: '', isbn: '', category: '', shelf: '', totalCopies: '1', availableCopies: '1' });
+  const [bookToDelete, setBookToDelete] = useState<Book | null>(null);
 
   const notify = (payload: { title: string; message: string; type: Notification['type']; userId?: string; targetRole?: UserRole }) => {
     addNotification({ id: crypto.randomUUID(), date: new Date().toISOString().split('T')[0], read: false, ...payload });
@@ -63,6 +77,81 @@ export default function LibraryPage() {
     addBook(book);
     setAddBookDialog(false);
     setNewBook({ title: '', author: '', isbn: '', category: '', totalCopies: '1', shelf: '' });
+  };
+
+  const startEditBook = (book: Book) => {
+    setEditBook(book);
+    setEditForm({
+      title: book.title,
+      author: book.author,
+      isbn: book.isbn,
+      category: book.category,
+      shelf: book.shelf,
+      totalCopies: String(book.totalCopies),
+      availableCopies: String(book.availableCopies),
+    });
+  };
+
+  const handleUpdateBookDetails = () => {
+    if (!isLibrarian || !editBook) {
+      toast({ title: 'Action restricted', description: 'Only the librarian can manage the catalog.', variant: 'destructive' });
+      return;
+    }
+    const totalCopies = Number(editForm.totalCopies);
+    const availableCopies = Number(editForm.availableCopies);
+    if (!Number.isFinite(totalCopies) || totalCopies <= 0) {
+      toast({ title: 'Invalid total copies', description: 'Total copies must be a positive number.', variant: 'destructive' });
+      return;
+    }
+    if (!Number.isFinite(availableCopies) || availableCopies < 0) {
+      toast({ title: 'Invalid available copies', description: 'Available copies cannot be negative.', variant: 'destructive' });
+      return;
+    }
+    const activeIssues = bookIssues.filter(issue => issue.bookId === editBook.id && ['issued', 'pending', 'overdue'].includes(issue.status)).length;
+    const maxAvailable = Math.max(0, totalCopies - activeIssues);
+    if (availableCopies > maxAvailable) {
+      toast({
+        title: 'Unavailable copies mismatch',
+        description: `Only ${maxAvailable} copy${maxAvailable === 1 ? ' is' : 'ies are'} free after accounting for active issues.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    const updated: Book = {
+      ...editBook,
+      title: editForm.title.trim(),
+      author: editForm.author.trim(),
+      isbn: editForm.isbn.trim(),
+      category: editForm.category.trim(),
+      shelf: editForm.shelf.trim(),
+      totalCopies,
+      availableCopies,
+    };
+    updateBook(updated);
+    addAuditLog({ action: 'Book updated', module: 'Library', userId: user!.id, userName: user!.name, details: `${updated.title}` });
+    toast({ title: 'Book updated', description: `${updated.title} was updated successfully.` });
+    setEditBook(null);
+  };
+
+  const requestDeleteBook = (book: Book) => {
+    if (!isLibrarian) {
+      toast({ title: 'Action restricted', description: 'Only the librarian can manage the catalog.', variant: 'destructive' });
+      return;
+    }
+    const hasActiveIssues = bookIssues.some(issue => issue.bookId === book.id && ['issued', 'pending', 'overdue'].includes(issue.status));
+    if (hasActiveIssues) {
+      toast({ title: 'Cannot delete book', description: 'Resolve all active issues or requests for this book first.', variant: 'destructive' });
+      return;
+    }
+    setBookToDelete(book);
+  };
+
+  const handleConfirmDeleteBook = () => {
+    if (!bookToDelete || !isLibrarian) return;
+    deleteBook(bookToDelete.id);
+    addAuditLog({ action: 'Book deleted', module: 'Library', userId: user!.id, userName: user!.name, details: bookToDelete.title });
+    toast({ title: 'Book deleted', description: `${bookToDelete.title} was removed from the catalog.` });
+    setBookToDelete(null);
   };
 
   const handleIssue = () => {
@@ -206,6 +295,8 @@ export default function LibraryPage() {
         <div className="stat-card"><div className="flex items-center justify-between mb-2"><span className="text-xs text-muted-foreground uppercase">Overdue</span><BookOpen className="w-4 h-4 text-destructive" /></div><p className="text-xl font-bold">{overdueCount}</p></div>
       </div>
 
+      {isLibrarian && <LibraryBulkUpload />}
+
       <Tabs defaultValue="catalog">
         <TabsList>
           <TabsTrigger value="catalog">Catalog</TabsTrigger>
@@ -220,6 +311,7 @@ export default function LibraryPage() {
               <TableHeader><TableRow>
                 <TableHead>Title</TableHead><TableHead className="hidden md:table-cell">Author</TableHead><TableHead className="hidden md:table-cell">Category</TableHead>
                 <TableHead>Available</TableHead><TableHead className="hidden lg:table-cell">Shelf</TableHead>
+                {isLibrarian && <TableHead className="text-right">Manage</TableHead>}
                 {isStudent && hasProfile && <TableHead className="text-right">Action</TableHead>}
               </TableRow></TableHeader>
               <TableBody>
@@ -230,6 +322,18 @@ export default function LibraryPage() {
                     <TableCell className="hidden md:table-cell text-sm">{b.category}</TableCell>
                     <TableCell><span className={b.availableCopies > 0 ? 'badge-success' : 'badge-destructive'}>{b.availableCopies}/{b.totalCopies}</span></TableCell>
                     <TableCell className="hidden lg:table-cell text-sm">{b.shelf}</TableCell>
+                    {isLibrarian && (
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => startEditBook(b)} title="Edit book">
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => requestDeleteBook(b)} title="Delete book">
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                     {isStudent && hasProfile && (
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" disabled={!canBorrowBook(b)} onClick={() => handleStudentBorrow(b.id)}>
@@ -351,6 +455,28 @@ export default function LibraryPage() {
       </Dialog>
 
       <Dialog
+        open={isLibrarian && !!editBook}
+        onOpenChange={open => {
+          if (!isLibrarian) return;
+          if (!open) setEditBook(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Book</DialogTitle></DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2 space-y-1"><Label>Title</Label><Input value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Author</Label><Input value={editForm.author} onChange={e => setEditForm({ ...editForm, author: e.target.value })} /></div>
+            <div className="space-y-1"><Label>ISBN</Label><Input value={editForm.isbn} onChange={e => setEditForm({ ...editForm, isbn: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Category</Label><Input value={editForm.category} onChange={e => setEditForm({ ...editForm, category: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Total Copies</Label><Input type="number" value={editForm.totalCopies} onChange={e => setEditForm({ ...editForm, totalCopies: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Available Copies</Label><Input type="number" value={editForm.availableCopies} onChange={e => setEditForm({ ...editForm, availableCopies: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Shelf</Label><Input value={editForm.shelf} onChange={e => setEditForm({ ...editForm, shelf: e.target.value })} /></div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4"><Button variant="outline" onClick={() => setEditBook(null)}>Cancel</Button><Button onClick={handleUpdateBookDetails}>Save changes</Button></div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
         open={isLibrarian && issueDialog}
         onOpenChange={open => {
           if (!isLibrarian) return;
@@ -366,6 +492,23 @@ export default function LibraryPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!bookToDelete} onOpenChange={open => { if (!open) setBookToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete book?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {bookToDelete ? `This will remove ${bookToDelete.title} from the catalog. This action cannot be undone.` : 'This action cannot be undone.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteBook} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
