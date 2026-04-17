@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { HostelRoom, HostelRequest, Notification, UserRole } from '@/types';
+import { HostelRoom, HostelRequest, Notification, UserRole, Gender } from '@/types';
 import HostelBulkUpload from '@/components/HostelBulkUpload';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,7 +64,7 @@ export default function HostelPage() {
     if (!student) return true;
     const occupantGenders = room.occupants
       .map(id => findStudentById(id)?.gender)
-      .filter((gender): gender is string => Boolean(gender));
+      .filter((gender): gender is Gender => Boolean(gender));
     return occupantGenders.every(gender => gender === student.gender);
   };
 

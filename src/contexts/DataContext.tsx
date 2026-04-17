@@ -134,7 +134,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     createFeeSchedule(normalized, normalized.course);
   }, [createFeeSchedule]);
 
-  const addStudentsBulk = useCallback((batch: Student[]): BulkInsertSummary => {
+  const addStudentsBulk = useCallback((batch: Student[]): BulkInsertSummary<Student> => {
     if (batch.length === 0) return { inserted: [], duplicates: [] };
     const normalized = normalizeStudents(batch);
     const inserted: Student[] = [];
