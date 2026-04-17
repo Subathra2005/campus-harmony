@@ -428,7 +428,7 @@ export default function CampusAssistant() {
               <>
                 <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                   <span>Step {currentStep + 1} of {activeSteps.length}</span>
-                  <Button type="button" variant="ghost" size="xs" onClick={cancelFlow}>Cancel</Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={cancelFlow}>Cancel</Button>
                 </div>
                 <p className="text-xs text-foreground">{currentPrompt.question}</p>
                 {currentPrompt.type === 'textarea' ? (
