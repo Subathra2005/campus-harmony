@@ -1,3 +1,2 @@
-# Welcome to your Lovable project
+A UNIFIED ERP-BASED PLATFORM FOR STUDENT RECORDS, ADMISSIONS, AND ACADEMIC OPERATIONS
 
-TODO: Document your project here
